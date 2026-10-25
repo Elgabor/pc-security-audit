@@ -1,0 +1,4 @@
+interface:
+  display_name: "PC Security Audit"
+  short_description: "Controlli di sicurezza PC e agenti, anche quotidiani"
+  default_prompt: "Usa $pc-security-audit per controllare la sicurezza del computer e degli agenti, spiegare i rischi verificati e proporre le azioni necessarie."
