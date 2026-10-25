@@ -1,66 +1,67 @@
-# Audit macOS
+# macOS audit
 
-## Baseline e protezioni
+## Baseline and protections
 
-Usare `scripts/audit.py collect`: versione, architettura, stato SIP/Gatekeeper/
-FileVault/firewall, spazio, pressione memoria, snapshot processi senza argomenti,
-metadati di LaunchAgents/Daemons e cartelle di estensioni agentiche. Il helper
-non interroga la keychain, non fa scansioni AV e non certifica l'assenza di malware.
-Eseguire con `python3 -I -S -B` da una copia fidata, senza elevazione. La home
-proviene dal database account del sistema; un utente/elevazione ambiguo rende
-NOT RUN l'inventario personale. Seguire [checks.md](checks.md) per i
-controlli completi e [incident.md](incident.md) in caso d'incidente.
+Use `scripts/audit.py collect` for version, architecture, SIP/Gatekeeper/
+FileVault/firewall status, disk space, memory pressure, process snapshots without
+arguments, and metadata for LaunchAgents/Daemons and agent-extension directories.
+The helper does not query the keychain, perform AV scans, or certify absence of
+malware. Run it with `python3 -I -S -B` from a trusted copy, without elevation.
+The home directory comes from the system account database; ambiguous user or
+elevation context makes the personal inventory NOT RUN. Follow
+[checks.md](checks.md) for full checks and [incident.md](incident.md) for incidents.
 
-Verificare poi i domini mancanti con le superfici native:
+Then verify missing domains through native interfaces:
 
-- Aggiornamenti: versione/build e release di sicurezza Apple applicabile, stato
-  del riavvio e aggiornamenti delle app/runtime realmente usati. Consultare web
-  solo per fonti pubbliche; ricerca di patch non autorizza installazione.
-- Protezioni: interpretare gli output, non l'exit code. `spctl --status` non
-  equivale a una scansione XProtect né a controllo di ogni app o script.
-- FileVault: controllare lo stato e chiedere se il recupero è stato provato;
-  non richiedere di mostrare o copiare la chiave. Cifratura hardware e FileVault
-  sono livelli distinti su Apple silicon/T2.
-- Privacy: Impostazioni > Privacy e sicurezza; Accesso completo al disco,
-  Accessibilità, Registrazione schermo e Automazione per terminale, editor,
-  harness, scanner e applicazioni remote. Registrare nomi/scopo, non dati utente.
-- Login e background: Impostazioni > Generali > Elementi login ed estensioni;
-  confrontare con i metadati di `~/Library/LaunchAgents`, `/Library/LaunchAgents`
-  e `/Library/LaunchDaemons`. Non caricare né scaricare job durante l'audit.
-  Verificare anche helper privilegiati, cron/periodic, avvio shell ed estensioni
-  IDE quando pertinenti: nel collector restano esplicitamente NOT RUN.
-- Gestione dispositivo: profili, estensioni di sistema/rete, VPN/proxy e
-  condivisioni. Profilo sconosciuto non significa malevolo; verificare proprietà
-  aziendale e origine prima di proporre rimozione.
-- Rete: firewall in ingresso, servizi in ascolto e traffico in uscita sono
-  controlli distinti. Correlare PID e immagine; limitare IP/domini nel report.
-- Browser: estensioni, permessi, criteri e sincronizzazione; non aprire database,
-  cookie, password o profili completi. Usare soltanto UI autorizzata.
-- Identità e cloud: applicare [checks.md](checks.md) agli account pertinenti;
-  login e verifiche con dati sensibili restano privati all'utente. Non dedurre
-  la sicurezza degli account dall'esito delle protezioni del Mac.
+- Updates: version/build, applicable Apple security releases, pending restart,
+  and updates for apps/runtimes actually used. Browse only public sources;
+  researching patches does not authorize installation.
+- Protections: interpret output rather than the exit code. `spctl --status`
+  is not an XProtect scan or a check of every app or script.
+- FileVault: check status and ask whether recovery was tested; do not request
+  that the key be displayed or copied. Hardware encryption and FileVault are
+  distinct layers on Apple silicon/T2.
+- Privacy: System Settings > Privacy & Security; Full Disk Access, Accessibility,
+  Screen Recording, and Automation for terminals, editors, harnesses, scanners,
+  and remote-access apps. Record names/scope, not user data.
+- Login and background: System Settings > General > Login Items & Extensions;
+  compare with metadata from `~/Library/LaunchAgents`, `/Library/LaunchAgents`,
+  and `/Library/LaunchDaemons`. Do not load or unload jobs during the audit.
+  Also check privileged helpers, cron/periodic, shell startup, and IDE extensions
+  when relevant: these remain explicitly NOT RUN in the collector.
+- Device management: profiles, system/network extensions, VPN/proxy, and sharing.
+  An unfamiliar profile is not necessarily malicious; verify organizational
+  ownership and origin before proposing removal.
+- Network: inbound firewall, listening services, and outbound traffic are distinct
+  checks. Correlate PID and executable image; minimize IPs/domains in reports.
+- Browser: extensions, permissions, policies, and synchronization; do not open
+  databases, cookies, passwords, or complete profiles. Use only authorized UI.
+- Identity and cloud: apply [checks.md](checks.md) to relevant accounts; login
+  and sensitive verification steps remain private to the user. Do not infer
+  account security from the Mac's protection status.
 
-## Indagini mirate
+## Targeted investigation
 
-Per un sospetto identificato correlare rilevamento AV/EDR, percorso, firma,
-origine, processo padre, connessioni, persistenza e danno. Non cercare segreti o
-ispezionare dump di memoria. La firma valida non prova innocuità; un programma
-non firmato, un nuovo job o CPU alta non prova compromissione.
+For a specific suspicion, correlate AV/EDR detections, path, signature, origin,
+parent process, connections, persistence, and harm. Do not search for secrets
+or inspect memory dumps. A valid signature does not prove harmlessness; an
+unsigned program, a new job, or high CPU usage does not prove compromise.
 
-KnockKnock/BlockBlock/LuLu, se già presenti e autorizzati, coprono inventario
-persistenza, nuovi eventi e rete in uscita rispettivamente. L'avvio può
-richiedere FDA o altre autorizzazioni e lookup esterni: non concederli
-implicitamente. Nessuna installazione o upload di campioni durante l'audit.
+KnockKnock/BlockBlock/LuLu, when already installed and authorized, cover
+persistence inventory, new events, and outbound network activity respectively.
+Launching them may require Full Disk Access, other permissions, or external
+lookups: do not grant these implicitly. No installation or sample uploads
+during the audit.
 
-## Backup e recupero
+## Backup and recovery
 
-Controllare disponibilità, separazione, cifratura e data della copia senza
-leggere contenuti personali. Una prova di ripristino usa file campione scelti
-dall'utente e una destinazione autorizzata. Una cartella iCloud sincronizzata
-non dimostra recupero indipendente da cancellazione/ransomware. In caso di
-ricostruzione non ripristinare indiscriminatamente hook, profili e sessioni.
+Check backup availability, separation, encryption, and date without reading
+personal contents. A restore test uses sample files chosen by the user and an
+authorized destination. A synchronized iCloud folder does not establish recovery
+independent of deletion/ransomware. During a rebuild, do not indiscriminately
+restore hooks, profiles, and sessions.
 
-Fonti: [Apple Platform Security](https://support.apple.com/guide/security/welcome/web),
+Sources: [Apple Platform Security](https://support.apple.com/guide/security/welcome/web),
 [Malware](https://support.apple.com/guide/security/protecting-against-malware-sec469d47bd8/web),
 [FileVault](https://support.apple.com/guide/mac-help/protect-data-on-your-mac-with-filevault-mh11785/mac),
-[profili](https://support.apple.com/guide/personal-safety/review-and-delete-configuration-profiles-ips327569a75/web).
+[configuration profiles](https://support.apple.com/guide/personal-safety/review-and-delete-configuration-profiles-ips327569a75/web).

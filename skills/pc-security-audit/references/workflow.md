@@ -27,7 +27,7 @@ report the limitation. Missing tooling is not permission to install it.
 
 ## Report contract
 
-Record audit ID, timestamp/fuso, verified machine alias, OS/environment,
+Record audit ID, timestamp/timezone, verified machine alias, OS/environment,
 effective user/privileges, tool origin, scope, exclusions and output destination.
 For each pertinent domain give status, method, time, period covered, evidence,
 limits and the next way to close a gap. Domains: system/patches, protections,

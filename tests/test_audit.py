@@ -57,7 +57,7 @@ class PlanTests(unittest.TestCase):
     def test_cli_json_is_utf8_even_if_caller_configured_ascii_stdout(self):
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory).resolve()/"plan.json"
-            value=plan(); value["actions"][0]["reason"]="Neve \u2744 verificata"
+            value=plan(); value["actions"][0]["reason"]="Verified snow \u2744"
             path.write_text(json.dumps(value),encoding="utf-8")
             code="import sys,runpy; sys.stdout.reconfigure(encoding='ascii'); sys.argv=sys.argv[1:]; runpy.run_path(sys.argv[0],run_name='__main__')"
             result=subprocess.run([sys.executable,"-I","-S","-B","-c",code,str(SCRIPT),"digest-plan",str(path)],capture_output=True,timeout=10)

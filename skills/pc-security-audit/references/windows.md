@@ -1,94 +1,92 @@
-# Audit Windows
+# Windows audit
 
-Usare PowerShell nativo (5.1+ o 7+) senza profili, bypass di execution policy,
-installazione moduli o elevazione automatica. `scripts/windows_collect.ps1`
-restituisce metadati locali; i controlli non disponibili sono NOT RUN, non
-false prove di protezione assente. Dall'harness applicare un timeout ragionevole
-alla chiamata (per esempio 150 secondi) e segnalare un risultato incompleto.
-Il collector usa job propri con timeout per controllo (default 8 secondi),
-budget di raccolta complessivo (default 110 secondi) e stream diagnostici
-non mischiati al JSON. Stop/Remove riguarda solo i job da lui creati. Un arresto
-esterno può comunque impedire l'output finale: segnalare run incompleto.
-Usa moduli dei percorsi di sistema ed enum serializzati come testo. Un timeout
-non ferma processi dell'utente. Exit 1 indica controlli falliti, 2 copertura
-incompleta. Se la policy blocca il file, dichiarare NOT RUN: usare soltanto
-controlli interattivi consentiti dall'amministratore, senza bypass della policy.
-PowerShell presente in WSL/Linux non dimostra accesso al vero host Windows.
-Leggere anche [checks.md](checks.md) e [incident.md](incident.md) se
-sono richiesti prevenzione completa o recupero da un incidente.
+Use native PowerShell (5.1+ or 7+) without profiles, execution-policy bypasses,
+module installation, or automatic elevation. `scripts/windows_collect.ps1`
+returns local metadata; unavailable checks are NOT RUN rather than false
+evidence of missing protection. Apply a reasonable caller timeout from the
+harness, for example 150 seconds, and report incomplete results.
+The collector creates its own jobs with a per-check timeout (default 8 seconds),
+a total collection budget (default 110 seconds), and diagnostic streams kept
+separate from JSON. Stop/Remove applies only to its own jobs. External termination
+can still prevent final output: report an incomplete run.
+It uses modules from system paths and serializes enums as text. A timeout does
+not stop user processes. Exit 1 means failed checks; 2 means incomplete coverage.
+If policy blocks the file, report NOT RUN: use only interactive checks permitted
+by the administrator, without bypassing policy. PowerShell in WSL/Linux does
+not establish access to the actual Windows host. Also read [checks.md](checks.md)
+and [incident.md](incident.md) for full prevention or incident recovery.
 
-## Domini
+## Domains
 
-- **Sistema:** versione/build/architettura e supporto effettivo della release;
-  confrontare gli aggiornamenti con documentazione Microsoft corrente. Un elenco
-  di hotfix non prova che tutto il software sia aggiornato. Nessun update o
-  riavvio durante l'audit.
-- **Defender:** interpretare `Get-MpComputerStatus`; engine, firme, protezione
-  real-time, cloud e tamper protection. Modalità passiva può derivare da altro
-  antivirus: verificare la protezione reale, senza avviarne due simultaneamente.
-- **Esclusioni:** il collector restituisce conteggi, non percorsi/processi o
-  altri valori potenzialmente privati. Se serve una verifica puntuale, usare
-  la UI autorizzata e riportare soltanto l'esito rispetto al target sospetto.
-- **Firewall:** `Get-NetFirewallProfile`; distinguere profili e regole da
-  policy effettiva (`-PolicyStore ActiveStore`) e da
-  traffico effettivamente raggiungibile. `Get-NetTCPConnection` espone una
-  fotografia delle connessioni, non la storia della macchina.
-  Considerare bind locale e UDP; il campione del collector non prova completezza.
-- **Hardware:** Secure Boot, Memory Integrity/HVCI e requisiti driver. Un check
-  UEFI non disponibile è NOT RUN; non proporre di disabilitare una protezione
-  per nascondere incompatibilità o warning.
-- **Cifratura:** `Get-BitLockerVolume` con selezione di MountPoint,
+- **System:** version/build/architecture and actual release support; compare
+  updates against current Microsoft documentation. A hotfix list does not prove
+  all software is current. No updates or restarts during the audit.
+- **Defender:** interpret `Get-MpComputerStatus`; engine, signatures, real-time,
+  cloud, and tamper protection. Passive mode can result from another antivirus:
+  verify actual protection without starting two engines simultaneously.
+- **Exclusions:** the collector returns counts, not paths/processes or other
+  potentially private values. For targeted verification, use authorized UI and
+  report only the outcome relevant to the suspicious target.
+- **Firewall:** `Get-NetFirewallProfile`; distinguish profiles and rules from
+  effective policy (`-PolicyStore ActiveStore`) and actual reachable traffic.
+  `Get-NetTCPConnection` shows a connection snapshot rather than machine history.
+  Consider local bind addresses and UDP; the collector's sample does not prove
+  completeness.
+- **Hardware:** Secure Boot, Memory Integrity/HVCI, and driver requirements.
+  An unavailable UEFI check is NOT RUN; do not propose disabling protection
+  to hide incompatibilities or warnings.
+- **Encryption:** `Get-BitLockerVolume`, selecting MountPoint,
   VolumeStatus, ProtectionStatus, EncryptionMethod, EncryptionPercentage.
-  Non enumerare KeyProtector, RecoveryPassword o `manage-bde -protectors -get`.
-  Verificare con l'utente che il recupero sia accessibile, senza leggerne la
-  chiave. Distinguere Device Encryption da disponibilità delle UI BitLocker.
-- **Persistenza:** task (`Get-ScheduledTask`), servizi (`Get-Service`) e WMI
-  (`Get-CimInstance` locale in `root/subscription`). Nomi/conteggi non bastano
-  a giudicare target e azioni; usare native UI/Autoruns già disponibile e
-  autorizzato per verifiche puntuali. Non stampare Actions, CommandLineTemplate,
-  ScriptText o righe di comando integrali che possono contenere segreti.
-  Per i soli conteggi, il collector richiede `Get-CimInstance -KeyOnly`: evitare
-  di acquisire corpi di script o template anche quando non vengono stampati.
-- **Avvio e browser:** Startup, Run/RunOnce, estensioni, criteri, servizi remoti,
-  utenti/gruppi e applicazioni amministrative. Un consumer WMI non è di per sé
-  malevolo; non assumere un numero universale di consumer legittimi.
-  Verificare in modo mirato anche UAC, RDP/SMB, SmartScreen/PUA, Credential Guard,
-  application control e ASR quando pertinenti. I corrispondenti NOT RUN del
-  collector richiedono verifiche native: non sono controlli già eseguiti.
-- **Identità e cloud:** applicare [checks.md](checks.md) agli account
-  pertinenti, usando superfici autorizzate e conferme non segrete dell'utente.
-  Nessun accesso agli store locali di password/cookie.
-- **Backup:** verificare disponibilità, separazione, cifratura e recupero con
-  campioni scelti dall'utente e destinazione autorizzata. Ripristino dei dati
-  e recupero/revoca delle sessioni sono controlli separati.
+  Do not enumerate KeyProtector, RecoveryPassword, or `manage-bde -protectors -get`.
+  Verify with the user that recovery is accessible without reading the key.
+  Distinguish Device Encryption from availability of BitLocker UI.
+- **Persistence:** tasks (`Get-ScheduledTask`), services (`Get-Service`), and
+  local WMI (`Get-CimInstance` in `root/subscription`). Names/counts are insufficient
+  to assess targets and actions; use native UI/Autoruns already available and
+  authorized for targeted checks. Do not print Actions, CommandLineTemplate,
+  ScriptText, or full command lines that may contain secrets. For counts only,
+  the collector requests `Get-CimInstance -KeyOnly`: avoid acquiring script bodies
+  or templates even when they would not be printed.
+- **Startup and browser:** Startup, Run/RunOnce, extensions, policies, remote
+  services, users/groups, and administrative apps. A WMI consumer is not inherently
+  malicious; do not assume a universal count of legitimate consumers. Also check
+  UAC, RDP/SMB, SmartScreen/PUA, Credential Guard, application control, and ASR
+  when relevant. Corresponding collector NOT RUN entries require native checks;
+  they are not checks already completed.
+- **Identity and cloud:** apply [checks.md](checks.md) to relevant accounts through
+  authorized interfaces and nonsecret user confirmations. Do not access local
+  password/cookie stores.
+- **Backup:** verify availability, separation, encryption, and recovery using
+  user-selected samples and an authorized destination. Data restoration and
+  session recovery/revocation are separate checks.
 
-## Scansioni
+## Scans
 
-Una scansione AV può mettere file in quarantena e modificare stato. Se non è
-già autorizzata, includerla nel piano con effetti/riavvii. Non confondere una
-query sullo stato con una scansione eseguita.
+An AV scan can quarantine files and change state. If not already authorized,
+include it in the plan with its effects and restarts. Do not confuse a status
+query with a completed scan.
 
-Defender Offline usa un ambiente esterno al normale kernel; verificare requisiti
-Microsoft aggiornati, WinRE, architettura e antivirus attivo. La documentazione
-consultata esclude Windows ARM e Windows Server: non dichiarare compatibilità
-universale. Può richiedere riavvio e gestione del recupero BitLocker: pianificare
-questi effetti senza leggere la chiave né sospendere cifratura implicitamente.
-Un risultato negativo non esclude furto storico di credenziali o persistenza cloud.
+Defender Offline uses an environment outside the normal kernel; verify current
+Microsoft requirements, WinRE, architecture, and active antivirus. The consulted
+documentation excludes Windows ARM and Windows Server: do not claim universal
+compatibility. It may require a restart and BitLocker recovery handling: plan
+these effects without reading the key or implicitly suspending encryption.
+A negative result does not rule out historical credential theft or cloud persistence.
 
-## Candidati di pulizia
+## Cleanup candidates
 
-Per una directory assoluta scelta dall'utente, usare `Get-Item -LiteralPath`
-e `Get-ChildItem -LiteralPath <directory> -Force` con output limitato a nome,
-dimensione, attributi e LastWriteTimeUtc. Escludere nomi sensibili e reparse
-point prima di scendere. Evitare `-Recurse` su un intero profilo: non comprende
-automaticamente né tutti i permessi né i confini di riservatezza. I nomi sono
-privati; minimizzare la condivisione e applicare [workflow.md](workflow.md) prima di proporre
-qualsiasi rimozione. Storage Sense, file temporanei e pulizia app sono proposte
-con target/effetti dichiarati, non un bottone generico per liberare spazio.
+For an absolute directory chosen by the user, use `Get-Item -LiteralPath` and
+`Get-ChildItem -LiteralPath <directory> -Force`, limiting output to name, size,
+attributes, and LastWriteTimeUtc. Exclude sensitive names and reparse points
+before descending. Avoid `-Recurse` over an entire profile: it does not
+automatically honor every permission or privacy boundary. Names are private;
+minimize sharing and apply [workflow.md](workflow.md) before proposing removal.
+Storage Sense, temporary-file cleanup, and app cleanup are proposals with stated
+targets/effects rather than a generic space-recovery button.
 
-Fonti: [Defender status](https://learn.microsoft.com/en-us/powershell/module/defender/get-mpcomputerstatus),
+Sources: [Defender status](https://learn.microsoft.com/en-us/powershell/module/defender/get-mpcomputerstatus),
 [Defender Offline](https://learn.microsoft.com/en-us/defender-endpoint/microsoft-defender-offline),
 [BitLocker status](https://learn.microsoft.com/en-us/powershell/module/bitlocker/get-bitlockervolume),
 [Get-ScheduledTask](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/get-scheduledtask),
 [WMI persistence](https://learn.microsoft.com/en-us/windows/win32/wmisdk/receiving-events-at-all-times),
-[revoca accessi](https://learn.microsoft.com/en-us/entra/identity/users/users-revoke-access).
+[access revocation](https://learn.microsoft.com/en-us/entra/identity/users/users-revoke-access).
