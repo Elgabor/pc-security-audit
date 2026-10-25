@@ -50,7 +50,12 @@ a flaw. An urgent patch proposal does not require evidence of active harm.
 After approved work verify the loaded instance, required restart and residual
 exposure, without declaring a mitigation equivalent to a fix without evidence.
 
-## Accounts and phishing
+## Local account safety and user-guided recovery
+
+Automatic audits remain local. Do not query cloud/provider accounts or grants
+as part of this skill. The guidance below supports separately requested private
+user steps after a local incident or phishing report; mark remote activity
+outside scope rather than using connected services implicitly.
 
 Select only relevant email/device/cloud/AI/repository/backup accounts. Use
 official UI or existing authorized interfaces with nonsecret fields; the user

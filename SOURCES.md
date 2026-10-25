@@ -15,6 +15,18 @@ material rather than policy.
   a native collector plus triage, separating read-only checks from fixes. Agent-log,
   keychain, history, and store scans that would violate this project's privacy
   boundaries were not adopted; popularity was not treated as proof of quality.
+- [NIST macOS Security Compliance Project](https://github.com/usnistgov/macos_security):
+  selected firewall-stealth and screensaver-password/grace rules inform fixed
+  native preference checks. No downloaded enforcement scripts or profiles run;
+  this is not full compliance certification. Rule IDs are in each observation.
+- [Cisco Skill Scanner](https://github.com/cisco-ai-defense/skill-scanner) and its
+  [export models](https://github.com/cisco-ai-defense/skill-scanner/blob/main/skill_scanner/core/models.py):
+  local report ingestion preserves analyzer failures, suppressed/cross-skill
+  findings and evidence timestamps. The independent lightweight local triage
+  engine is not Cisco's implementation and has different detection coverage.
+- [OSV schema](https://ossf.github.io/osv-schema/): local cached advisories are
+  matched to actual inventory versions; unsupported ranges remain unknown.
+  No package installation, automatic advisory download or cloud scanner is used.
 - [Apple Platform Security](https://support.apple.com/guide/security/welcome/web)
   and [Microsoft Defender](https://learn.microsoft.com/en-us/defender-endpoint/microsoft-defender-antivirus-windows):
   native controls to verify against the actual version and environment.

@@ -2,7 +2,7 @@
 
 An agent skill for macOS/Windows security audits, coding-agent permission reviews,
 daily checks, and interventions within human authorization. The portable skill
-directory is `skills/pc-security-audit/`: 12 files, with no external Python dependencies.
+directory is `skills/pc-security-audit/`: 14 files, with no external Python dependencies.
 
 ## Usage
 
@@ -47,12 +47,20 @@ audit available for manual use.
 
 ## Limitations and development
 
-The two Python helpers require Python 3.11+; the Windows collector requires
+The three Python helpers require Python 3.11+; the Windows collector requires
 PowerShell 5.1+ or 7+. Missing runtimes produce NOT RUN, without implicit
 installation. Helpers collect metadata or validate records; they do not install
 protections or perform remediation. Saving a report to disk does not make
 analysis through an AI provider entirely local. Secrets and authentication
 stores are excluded.
+
+Local inspection includes three NIST mSCP-referenced macOS preference checks,
+bounded skill-source triage, offline dependency checks against a supplied OSV
+cache, and a Cisco Skill Scanner local-export adapter. The built-in triage engine
+does not replace Cisco's scanner. See the [local security module](skills/pc-security-audit/references/local-security.md)
+for exact commands, supported inputs, limits and snapshot integration. Local
+thread checks use native metadata interfaces; transcripts/session stores are
+excluded. No Cloudflare deployment or cloud-account auditing is included.
 
 A daily audit is not continuous detection and does not certify absence of
 compromise. Native Windows execution, real scheduled runs, and behavior with

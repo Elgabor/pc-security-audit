@@ -26,7 +26,7 @@ import unicodedata
 from typing import Any
 
 MAX_OUTPUT = 262_144
-COLLECTOR_VERSION = "0.2.0"
+COLLECTOR_VERSION = "0.3.0"
 SECRET_COMPONENTS = {
     ".ssh", ".aws", ".azure", ".kube", ".gnupg", "keychains", "keychain",
     "credentials", "credential", "cookies", "sessions", "sessionstore",
@@ -202,6 +202,64 @@ def native(check: str, argv: list[str], timeout: int = 10) -> dict[str, Any]:
                   meaning="command completed; interpretation of protection state still required")
 
 
+NIST_PREFERENCES = {
+    "firewall_stealth": ("com.apple.security.firewall", "EnableStealthMode",
+                         "system_settings_firewall_stealth_mode_enable", None),
+    "screen_lock_password": ("com.apple.screensaver", "askForPassword",
+                             "system_settings_screensaver_password_enforce", None),
+    "screen_lock_grace": ("com.apple.screensaver", "askForPasswordDelay",
+                          "system_settings_screensaver_ask_for_password_delay_enforce", 5),
+}
+
+
+def native_preference(check: str, firewall_state: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Read three fixed nonsecret preferences; never execute downloaded rule code."""
+    domain, key, rule, maximum = NIST_PREFERENCES[check]
+    base = {"reference_rule": rule, "assessment_scope": "selected observed setting, not runtime enforcement",
+            "method": "native_firewall_query" if check == "firewall_stealth" else "managed_user_defaults"}
+    program = "/usr/libexec/ApplicationFirewall/socketfilterfw" if check == "firewall_stealth" else "/usr/bin/osascript"
+    if not Path(program).is_file():
+        return record(check, "NOT RUN", reason="native_command_missing", **base)
+    # Domain/key come only from the fixed table; no caller-supplied code or paths.
+    script = ('ObjC.import("Foundation"); var d=$.NSUserDefaults.alloc.initWithSuiteName('
+              + json.dumps(domain) + '); function val(k){var v=ObjC.unwrap(d.objectForKey(k));'
+              + 'return v === undefined ? null : v;} JSON.stringify({value:val(' + json.dumps(key)
+              + '),forced:d.objectIsForcedForKeyInDomain(' + json.dumps(key) + ',' + json.dumps(domain)
+              + ') === true,password:val("askForPassword"),password_forced:d.objectIsForcedForKeyInDomain("askForPassword",'
+              + json.dumps(domain) + ') === true})')
+    try:
+        argv = [program, "--getstealthmode"] if check == "firewall_stealth" else [program, "-l", "JavaScript", "-e", script]
+        result = run_bounded(argv, 8)
+        if result.returncode or any(getattr(result, x, False) for x in ("timed_out", "output_limited", "unreaped")):
+            return record(check, "NOT RUN", reason="native_preference_unavailable", **base)
+        if check == "firewall_stealth":
+            summary = result.stdout.strip().lower()
+            match = re.fullmatch(rb"firewall stealth mode is (on|off)\.?|stealth mode (enabled|disabled)\.?", summary)
+            value = next((part in (b"on", b"enabled") for part in match.groups() if part), None) if match else None
+            prerequisite = firewall_state if firewall_state is not None else native("firewall", [program, "--getglobalstate"])
+            trusted = prerequisite.get("enabled") is True and prerequisite.get("protection_status") == "PASS"
+        else:
+            observed = json.loads(result.stdout)
+            if not isinstance(observed, dict):
+                raise ValueError("invalid_preference_shape")
+            value = observed.get("value")
+            trusted = observed.get("forced") is True
+            if maximum is not None:
+                password = observed.get("password")
+                trusted &= (observed.get("password_forced") is True and type(password) in (bool, int) and password == 1)
+    except (OSError, ValueError, RecursionError):
+        return record(check, "NOT RUN", reason="native_preference_unavailable", **base)
+    valid = (type(value) is bool or type(value) is int and value in (0, 1)) if maximum is None else type(value) is int and 0 <= value <= 86400
+    if not valid:
+        return record(check, "NOT RUN", reason="preference_unset_or_unrecognized", **base)
+    meets = bool(value) if maximum is None else value <= maximum
+    status = ("PASS" if meets else "FAIL") if trusted else "PARTIAL"
+    data = {"meets_baseline": meets} if trusted else {"reason": "effective_setting_or_prerequisite_unverified"}
+    if maximum is not None:
+        data.update(seconds=value, recommended_maximum_seconds=maximum)
+    return record(check, status, collection_status="PASS", protection_status=status if trusted else "NOT ASSESSED", **data, **base)
+
+
 def metadata(path: Path, info: os.stat_result | None = None) -> dict[str, Any]:
     info = info if info is not None else path.lstat()
     identity = {"device": info.st_dev, "inode": info.st_ino, "size": info.st_size,
@@ -269,6 +327,10 @@ def collect_macos() -> dict[str, Any]:
         ("memory_pressure", ["/usr/bin/memory_pressure", "-Q"]),
     ]
     checks = [native(name, argv) for name, argv in commands]
+    firewall_state = next(row for row in checks if row["check"] == "firewall")
+    checks.extend(native_preference(name, firewall_state) if os.getuid() == os.geteuid() and os.geteuid() != 0
+                  else record(name, "NOT RUN", reason="user_scope_uncertain_under_elevation")
+                  for name in NIST_PREFERENCES)
     checks.append(record("storage", "PASS", total_bytes=disk.total, free_bytes=disk.free,
                          used_bytes=disk.used, meaning="filesystem capacity, not a cleanup recommendation"))
     # No process arguments, environment, open files or network destination dumps.

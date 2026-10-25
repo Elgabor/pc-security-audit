@@ -31,8 +31,13 @@ headers, or tokens. If safe inspection is unavailable, mark NOT RUN without
 reading prohibited data.
 
 For OAuth grants, authorized cloud agents, API usage, and relevant charges,
-apply [checks.md](checks.md): local capabilities and remote access are distinct
-checks. Do not read credentials to reconstruct authorizations.
+record remote inspection as outside the local audit scope. A connector's local
+configuration can expose capabilities, but does not establish account activity.
+Do not read credentials to reconstruct authorizations.
+
+For local skill-source scans, offline dependency advisories, Cisco local exports
+and native local-thread metadata, follow [local-security.md](local-security.md).
+Inspect only native metadata listings; conversation/session stores remain excluded.
 
 ## Origin and loading
 

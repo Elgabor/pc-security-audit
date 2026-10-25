@@ -39,6 +39,10 @@ Agree retention; no implicit pruning, overwrites or baseline acceptance.
    method/time per domain. Missing login, tools, rights or approved network
    access become NOT RUN. Do not start discovered hooks/MCP or install updates.
    Public advisory queries use only authorized nonsecret product/version data.
+   Local source/OSV-cache/Cisco-export checks follow [local-security.md](local-security.md).
+   Use explicit matching scope IDs per engine/target and keep omitted inputs,
+   unsupported versions and missing scanner evidence visible. Cloud accounts
+   and Cloudflare integrations are outside the audit.
 3. Save new minimized reports/snapshots only in the approved directory with
    unique names. Compare exact compatible observations. A failed comparison
    does not discard the collection report or make the baseline healthy.

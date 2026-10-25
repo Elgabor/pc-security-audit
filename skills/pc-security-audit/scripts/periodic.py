@@ -91,6 +91,35 @@ def _facts(check: dict[str, Any]) -> dict[str, Any]:
     """Whitelist stable fields; never retain arbitrary output, args, env or secrets."""
     facts: dict[str, Any] = {}
     name = check["check"]
+    if name in {"local_skill_triage", "local_cisco_report", "local_package_advisories"}:
+        data = check.get("data")
+        required = {"local_skill_triage": {"files_read", "bytes_read", "coverage_gaps", "finding_count"},
+                    "local_cisco_report": {"scanned_skills", "coverage_gaps", "suppressed_findings", "critical", "high", "medium", "low", "info"},
+                    "local_package_advisories": {"packages_assessed", "advisory_records", "coverage_gaps", "finding_count", "cache_age_minutes"}}[name]
+        missing = 0
+        for key in required:
+            value = data.get(key) if isinstance(data, dict) else None
+            if type(value) is int and 0 <= value <= 10_000_000:
+                facts[key] = value
+            else:
+                missing += 1
+        fingerprint = data.get("evidence_fingerprint") if isinstance(data, dict) else None
+        if isinstance(fingerprint, str) and re.fullmatch(r"[0-9a-f]{64}", fingerprint):
+            facts["evidence_fingerprint"] = fingerprint
+        else:
+            missing += 1
+        facts["metadata_fields_missing"] = missing
+    if name in {"firewall_stealth", "screen_lock_password", "screen_lock_grace"}:
+        facts["protection_fields_missing"] = 0
+        if type(check.get("meets_baseline")) is bool:
+            facts["meets_baseline"] = check["meets_baseline"]
+        else:
+            facts["protection_fields_missing"] = 1
+        if name == "screen_lock_grace":
+            if type(check.get("seconds")) is int and 0 <= check["seconds"] <= 86400:
+                facts["seconds"] = check["seconds"]
+            else:
+                facts["protection_fields_missing"] += 1
     if name in {"sip", "gatekeeper", "filevault", "firewall"} and "data" not in check:
         facts["protection_fields_missing"] = 0
         if type(check.get("enabled")) is bool:
@@ -201,6 +230,8 @@ def make_snapshot(collection: Any, machine_id: str, environment: str, scope_id: 
         raise ValueError("Explicit non-secret machine and scope IDs required")
     if environment not in {"host", "vm", "wsl", "container", "unknown"}:
         raise ValueError("Invalid environment")
+    if isinstance(collection, dict) and "scope_id" in collection and collection["scope_id"] != scope_id:
+        raise ValueError("Collector scope does not match requested scope")
     if not isinstance(collection, dict) or type(collection.get("schema_version")) is not int or collection["schema_version"] != 1:
         raise ValueError("Unsupported collector schema")
     if collection.get("platform") not in {"macos", "windows"}:
@@ -216,6 +247,8 @@ def make_snapshot(collection: Any, machine_id: str, environment: str, scope_id: 
         if not isinstance(check, dict) or not identifier(check.get("check")):
             raise ValueError("Invalid check")
         name = check["check"]
+        if name.startswith("local_") and collection.get("scope_id") != scope_id:
+            raise ValueError("Collector scope does not match requested scope")
         if check.get("status") not in STATUSES:
             raise ValueError("Unknown check status")
         path = check.get("path")
@@ -320,7 +353,9 @@ def coverage(snapshot: dict[str, Any]) -> list[str]:
 def concerns(snapshot: dict[str, Any]) -> list[str]:
     return sorted(key for key, check in snapshot["checks"].items()
                   if check["status"] == "FAIL" or check["protection_status"] == "FAIL"
-                  or any(type(value) is bool and not value for value in check["facts"].values()))
+                  or any(type(value) is bool and not value for value in check["facts"].values())
+                  or key.startswith("local_") and any(check["facts"].get(field, 0) > 0
+                     for field in ("finding_count", "critical", "high", "medium", "suppressed_findings")))
 
 
 def compare(previous: Any, current: Any, max_gap_hours: float = 36,
@@ -343,6 +378,8 @@ def compare(previous: Any, current: Any, max_gap_hours: float = 36,
     changed = sorted(key for key in set(old) & set(new) if stable(old[key]) != stable(new[key]))
     added = sorted(set(new) - set(old))
     old_concerns, new_concerns = set(concerns(previous)), set(concerns(current))
+    input_changed = {key for key in old.keys() & new.keys() if key.startswith("local_")
+                     and old[key]["facts"].get("evidence_fingerprint") != new[key]["facts"].get("evidence_fingerprint")}
     lost = sorted(set(missing) | {key for key in old.keys() & new.keys()
                   if old[key]["collection_status"] == "PASS" and new[key]["collection_status"] != "PASS"
                   or old[key]["protection_status"] in {"PASS", "FAIL"}
@@ -357,17 +394,21 @@ def compare(previous: Any, current: Any, max_gap_hours: float = 36,
         reasons.append("observations_changed; requires interpretation")
     if lost:
         reasons.append("coverage_lost; disappearance never closes a finding")
+    if input_changed:
+        reasons.append("local_evidence_changed; prior findings require reassessment")
     if new_concerns - old_concerns:
         reasons.append("new_observed_concern; not proof of compromise")
     if gap:
         reasons.append("run_gap_exceeds_policy; not evidence of continuous monitoring")
-    return {"status": "PARTIAL" if coverage(current) or lost or gap or new_concerns else "PASS",
+    unresolved_local = {key for key in old_concerns - new_concerns if key.startswith("local_")}
+    return {"status": "PARTIAL" if coverage(current) or lost or gap or new_concerns or input_changed or unresolved_local else "PASS",
             "verdict": "NOT ASSESSED", "notify": bool(reasons), "reasons": reasons,
             "added": added, "changed": changed, "missing": missing, "coverage_lost": lost,
             "current_gaps": coverage(current), "current_concerns": sorted(new_concerns),
             "persistent_concerns": sorted(new_concerns & old_concerns),
-            "unverified_prior_concerns": sorted(old_concerns & set(lost)),
-            "observed_improvements": sorted(old_concerns - new_concerns - set(lost)),
+            "inputs_not_comparable": sorted(input_changed),
+            "unverified_prior_concerns": sorted(old_concerns & (set(lost) | input_changed) | unresolved_local),
+            "observed_improvements": sorted(old_concerns - new_concerns - set(lost) - input_changed - unresolved_local),
             "run_gap_hours": (after - before).total_seconds() / 3600,
             "meaning": "Local observations only; no findings auto-closed, no consent or host attestation",
             "execution": "NONE"}

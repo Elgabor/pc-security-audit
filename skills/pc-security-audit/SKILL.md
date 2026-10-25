@@ -12,6 +12,9 @@ and privileges, ownership, requested checks and exclusions. Reuse decisions
 already made. Read [workflow.md](references/workflow.md) for privacy, evidence
 and authorization. In read-only scope deliver in chat; write reports/snapshots
 only to an approved destination. Preserve active work and current permissions.
+Inspect the local computer and its installed harnesses. Cloud management,
+Cloudflare deployments and remote-account inspection are outside this skill's
+audit scope; public advisory research needs authorized nonsecret queries.
 
 Choose the requested mode:
 
@@ -44,10 +47,14 @@ Collector exit 1 means failed checks, 2 incomplete coverage; inspect individual
 results. Exit zero does not certify a clean computer.
 
 For full reviews read [checks.md](references/checks.md): protection freshness,
-patches, exposure, backups, account security and phishing. For coding agents
+patches, local exposure, backups, local account safety and phishing. For coding agents
 read [harnesses.md](references/harnesses.md): actual shell/file/MCP/browser and
 background capabilities, trusted sources and supply chain. A narrow request
 keeps its scope. Home networks and other devices require explicit inclusion.
+For local skill-source triage, offline dependency matching, Cisco export review
+or local-thread metadata, read [local-security.md](references/local-security.md).
+Select source roots explicitly; metadata collection alone does not authorize
+content scans. Run each local engine within its declared limits and coverage.
 
 Correlate observations with primary advisories and independent evidence.
 Distinguish vulnerability, suspicious indicator and confirmed compromise.
